@@ -1,7 +1,0 @@
-streamlit>=1.28.0
-pandas
-numpy
-scikit-learn==1.6.1
-gensim
-seaborn
-matplotlib

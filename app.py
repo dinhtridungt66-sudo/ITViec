@@ -107,9 +107,11 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("### 👥 Thông tin nhóm")
 st.sidebar.info(
     "**Thành viên 1:**\n"
-    "Phạm Trung Tín\n\n"
+    "- Họ tên: Phạm Trung Tín\n"
+    "- 📧 [bagolti@yahoo.com](mailto:bagolti@yahoo.com)\n\n"
     "**Thành viên 2:**\n"
-    "Đinh Trí Dũng"
+    "- Họ tên: Đinh Trí Dũng\n"
+    "- 📧 [dungbluehn@gmail.com](mailto:dungbluehn@gmail.com)"
 )
 
 st.sidebar.markdown("---")

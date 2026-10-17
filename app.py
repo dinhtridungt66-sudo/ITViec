@@ -289,19 +289,71 @@ elif choice == "Gợi ý công ty tương tự":
 elif choice == "Recommend or Not":
     st.markdown('<p class="main-header">2. Recommend or Not</p>', unsafe_allow_html=True)
     st.write(
-        "Dự đoán khả năng **Recommend / Not Recommend** công ty "
-        "dựa trên điểm đánh giá của ứng viên"
+        "Đánh giá và dự đoán khả năng **Recommend / Not Recommend** "
+        "cho một công ty cụ thể từ danh sách ITViec."
     )
 
     if svm_model is None:
         st.error("Không load được model Classification (svm_tuned_model.pkl).")
         st.stop()
 
+    # --- BƯỚC 1: LẤY DANH SÁCH CÔNG TY TỪ RECOMMENDER ---
+    selected_company = "Công ty bất kỳ"
+    default_rating = 4
+    default_sal, default_train, default_mgmt, default_cul, default_off = 3, 3, 3, 3, 3
+
+    if recommender is not None and "companies" in recommender:
+        companies_df = recommender["companies"]
+        company_list = companies_df["Company Name"].tolist()
+
+        # Kiểm tra xem có công ty nào được gửi từ trang Gợi ý sang không
+        default_idx = 0
+        if "selected_company_for_eval" in st.session_state:
+            if st.session_state["selected_company_for_eval"] in company_list:
+                default_idx = company_list.index(st.session_state["selected_company_for_eval"])
+
+        st.markdown("##### 🏢 1. Chọn công ty cần đánh giá")
+        selected_company = st.selectbox(
+            "Chọn công ty từ hệ thống (hoặc gõ để tìm kiếm):",
+            company_list,
+            index=default_idx
+        )
+
+        # Lấy thông tin của công ty đang chọn
+        comp_info = companies_df[companies_df["Company Name"] == selected_company].iloc[0]
+
+        # Hiển thị tóm tắt thông tin công ty để người dùng có cơ sở chấm điểm
+        ic1, ic2, ic3 = st.columns(3)
+        ic1.info(f"**Lĩnh vực:** {comp_info.get('Company industry', 'N/A')}")
+        ic2.info(f"**Loại hình:** {comp_info.get('Company Type', 'N/A')}")
+        overall_val = comp_info.get("Overall rating", "N/A")
+        ic3.info(f"**Rating hiện tại trên ITViec:** ⭐ {overall_val}")
+
+        # Tự động gán mức điểm mặc định trên thanh trượt theo điểm gốc của công ty (nếu có)
+        def get_valid_score(col_name, fallback=3):
+            if col_name in comp_info and pd.notna(comp_info[col_name]):
+                try:
+                    val = int(round(float(comp_info[col_name])))
+                    return min(max(val, 1), 5)
+                except:
+                    return fallback
+            return fallback
+
+        default_rating = get_valid_score("Overall rating", 4)
+        default_sal = get_valid_score("Salary & benefits", default_rating)
+        default_train = get_valid_score("Training & learning", default_rating)
+        default_mgmt = get_valid_score("Management cares about me", default_rating)
+        default_cul = get_valid_score("Culture & fun", default_rating)
+        default_off = get_valid_score("Office & workspace", default_rating)
+
+    st.markdown("---")
+
+    # --- BƯỚC 2: CHỌN MODEL ---
     available_models = ["Linear SVM (Tuned)"]
     if hybrid_model is not None:
         available_models.append("Hybrid (Numeric + Text)")
 
-    model_choice = st.selectbox("Chọn mô hình", available_models)
+    model_choice = st.selectbox("🤖 2. Chọn mô hình dự đoán", available_models)
 
     if hybrid_model is None:
         st.warning(
@@ -311,20 +363,21 @@ elif choice == "Recommend or Not":
         )
 
     st.markdown("---")
-    st.write("##### Nhập điểm đánh giá (1 → 5)")
+    st.write(f"##### ⭐ 3. Chấm điểm đánh giá cho **{selected_company}** (1 → 5)")
+    st.caption("*(Các mức điểm dưới đây đã được gợi ý ban đầu dựa trên mặt bằng điểm của công ty, bạn có thể điều chỉnh lại theo trải nghiệm cá nhân)*")
 
     c1, c2 = st.columns(2)
     with c1:
-        rating = st.radio("⭐ Rating tổng thể", [1, 2, 3, 4, 5], index=3, horizontal=True)
-        salary_benefits = st.radio("💰 Salary & benefits", [1, 2, 3, 4, 5], index=2, horizontal=True)
-        training_learning = st.radio("📚 Training & learning", [1, 2, 3, 4, 5], index=2, horizontal=True)
+        rating = st.radio("⭐ Rating tổng thể", [1, 2, 3, 4, 5], index=default_rating - 1, horizontal=True)
+        salary_benefits = st.radio("💰 Salary & benefits", [1, 2, 3, 4, 5], index=default_sal - 1, horizontal=True)
+        training_learning = st.radio("📚 Training & learning", [1, 2, 3, 4, 5], index=default_train - 1, horizontal=True)
     with c2:
         management_cares = st.radio(
-            "👔 Management cares about me", [1, 2, 3, 4, 5], index=2, horizontal=True
+            "👔 Management cares about me", [1, 2, 3, 4, 5], index=default_mgmt - 1, horizontal=True
         )
-        culture_fun = st.radio("🎉 Culture & fun", [1, 2, 3, 4, 5], index=2, horizontal=True)
+        culture_fun = st.radio("🎉 Culture & fun", [1, 2, 3, 4, 5], index=default_cul - 1, horizontal=True)
         office_workspace = st.radio(
-            "🏢 Office & workspace", [1, 2, 3, 4, 5], index=2, horizontal=True
+            "🏢 Office & workspace", [1, 2, 3, 4, 5], index=default_off - 1, horizontal=True
         )
 
     review_length = st.number_input(
@@ -344,13 +397,17 @@ elif choice == "Recommend or Not":
     review_text = ""
     if model_choice == "Hybrid (Numeric + Text)":
         review_text = st.text_area(
-            "Nội dung review (Cleaned_Review_Text)",
+            f"Nội dung nhận xét về {selected_company} (Cleaned_Review_Text)",
             height=100,
             placeholder="great team, good salary, management needs improvement..."
         )
+        # Tự động cập nhật số từ nếu người dùng nhập text thực tế
+        if review_text.strip():
+            review_length = len(review_text.strip().split())
+            st.caption(f"💡 Độ dài review tự động tính từ văn bản: **{review_length} từ**")
 
     st.markdown("---")
-    submit = st.button("Submit", type="primary", use_container_width=True)
+    submit = st.button(f"Dự đoán Recommend cho {selected_company}", type="primary", use_container_width=True)
 
     if submit:
         features_numeric = pd.DataFrame([{
@@ -382,24 +439,24 @@ elif choice == "Recommend or Not":
             model_name = "Hybrid (Numeric + TF-IDF)"
 
         # ----- Kết quả -----
-        st.write("### Kết quả dự đoán")
+        st.write(f"### Kết quả dự đoán cho: **{selected_company}**")
         col_a, col_b = st.columns(2)
 
         with col_a:
             if pred == 1:
                 st.markdown(
-                    '<div class="result-box recommend">'
-                    '✅ RECOMMEND<br>'
-                    '<small>Nên giới thiệu công ty này</small>'
-                    '</div>',
+                    f'<div class="result-box recommend">'
+                    f'✅ RECOMMEND<br>'
+                    f'<small>Nên giới thiệu <b>{selected_company}</b></small>'
+                    f'</div>',
                     unsafe_allow_html=True
                 )
             else:
                 st.markdown(
-                    '<div class="result-box not-recommend">'
-                    '❌ NOT RECOMMEND<br>'
-                    '<small>Không nên giới thiệu công ty này</small>'
-                    '</div>',
+                    f'<div class="result-box not-recommend">'
+                    f'❌ NOT RECOMMEND<br>'
+                    f'<small>Không nên giới thiệu <b>{selected_company}</b></small>'
+                    f'</div>',
                     unsafe_allow_html=True
                 )
 
@@ -410,10 +467,11 @@ elif choice == "Recommend or Not":
 
         st.progress(prob_recommend, text=f"Recommend probability: {prob_recommend:.3f}")
 
-        # ----- Bảng tóm tắt (thay biểu đồ cột) -----
+        # ----- Bảng tóm tắt -----
         st.write("### Tóm tắt đánh giá đã nhập")
         summary = pd.DataFrame({
             "Tiêu chí": [
+                "Công ty đánh giá",
                 "Rating tổng thể",
                 "Salary & benefits",
                 "Training & learning",
@@ -425,15 +483,16 @@ elif choice == "Recommend or Not":
                 "Review Length"
             ],
             "Giá trị": [
-                rating,
-                salary_benefits,
-                training_learning,
-                management_cares,
-                culture_fun,
-                office_workspace,
-                avg_sub,
-                discrepancy,
-                review_length
+                str(selected_company),
+                str(rating),
+                str(salary_benefits),
+                str(training_learning),
+                str(management_cares),
+                str(culture_fun),
+                str(office_workspace),
+                str(avg_sub),
+                str(discrepancy),
+                str(review_length)
             ]
         })
         st.dataframe(summary, use_container_width=True, hide_index=True)

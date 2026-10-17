@@ -104,6 +104,15 @@ menu = [
 choice = st.sidebar.selectbox("Menu", menu)
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("### 👥 Thông tin nhóm")
+st.sidebar.info(
+    "**Thành viên 1:**\n"
+    "Phạm Trung Tín\n\n"
+    "**Thành viên 2:**\n"
+    "Đinh Trí Dũng"
+)
+
+st.sidebar.markdown("---")
 st.sidebar.caption("Đồ án tốt nghiệp Data Science\nPhòng LT & Mạng – CSC")
 
 # ==================== 1. HOME ====================
@@ -123,23 +132,7 @@ if choice == "Home":
     - **Recommend / Not Recommend** công ty từ review ứng viên
     """)
 
-    st.markdown("---")
-    st.markdown("### 👥 Thông tin nhóm")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.info("""
-        **Thành viên 1**  
-        Họ và tên: *Phạm Trung Tín*  
-        """)
-    with col2:
-        st.info("""
-        **Thành viên 2**  
-        Họ và tên: *Đinh Trí Dũng*  
-        """)
-
     st.info("👈 Sử dụng menu bên trái để chuyển chức năng.")
-
 # ==================== 2. CAPSTONE PROJECT ====================
 elif choice == "Capstone Project":
     st.markdown('<p class="main-header">Đồ án TN Data Science</p>', unsafe_allow_html=True)
